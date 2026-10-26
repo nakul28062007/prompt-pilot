@@ -363,6 +363,7 @@ name_label.pack(pady=2)
 good_for_label = Label(right_frame, text="", wraplength=520, justify="center", font=("Avenir Next", 12), fg="#374151", bg="#f3f4f6")
 good_for_label.pack(pady=2)
 
+models_label = Label(right_frame, text="", wraplength=520, justify="center", font=("Avenir Next", 12, "bold"), fg="#059669", bg="#f3f4f6")
 models_label.pack(pady=2)
 
 keywords_heading = Label(right_frame, text="", font=("Avenir Next", 15, "bold"), fg="#2563eb", bg="#f3f4f6")
