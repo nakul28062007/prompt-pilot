@@ -176,6 +176,54 @@ good_for = {
     },
 }
 
+models = {
+    "Claude": {
+        "default":     ["Opus", "Sonnet", "Haiku"],
+        "summarize":   ["Sonnet", "Haiku", "Opus"],
+        "translation": ["Sonnet", "Haiku", "Opus"],
+        "general":     ["Sonnet", "Haiku", "Opus"],
+    },
+    "Gemini": {
+        "default":     ["Pro", "Flash", "Flash-Lite"],
+        "summarize":   ["Flash", "Pro", "Flash-Lite"],
+        "translation": ["Flash", "Flash-Lite", "Pro"],
+        "general":     ["Flash", "Pro", "Flash-Lite"],
+    },
+    "ChatGPT": {
+        "default":     ["Pro", "Thinking", "Instant"],
+        "writing":     ["Thinking", "Instant", "Pro"],
+        "brainstorm":  ["Thinking", "Instant", "Pro"],
+        "summarize":   ["Instant", "Thinking", "Pro"],
+        "translation": ["Instant", "Thinking", "Pro"],
+        "general":     ["Instant", "Thinking", "Pro"],
+    },
+    "DeepSeek": {
+        "default":     ["V4-Pro", "V4-Flash"],
+        "translation": ["V4-Flash", "V4-Pro"],
+        "general":     ["V4-Flash", "V4-Pro"],
+    },
+    "Perplexity": {
+        "default":     ["Sonar Deep Research", "Sonar Reasoning Pro", "Sonar Pro", "Sonar"],
+        "general":     ["Sonar Pro", "Sonar", "Sonar Reasoning Pro"],
+    },
+    "Copilot": {
+        "default":     ["Think Deeper", "Quick Response"],
+        "writing":     ["Quick Response", "Think Deeper"],
+        "brainstorm":  ["Quick Response", "Think Deeper"],
+        "general":     ["Quick Response", "Think Deeper"],
+    },
+}
+
+tags = {
+    "Opus": "most capable", "Sonnet": "balanced", "Haiku": "fastest",
+    "Pro": "most capable", "Flash": "balanced", "Flash-Lite": "fastest",
+    "Thinking": "deep reasoning", "Instant": "fastest",
+    "V4-Pro": "most capable", "V4-Flash": "fastest",
+    "Sonar Deep Research": "most thorough", "Sonar Reasoning Pro": "multi-step reasoning",
+    "Sonar Pro": "more depth", "Sonar": "fastest",
+    "Think Deeper": "deep reasoning", "Quick Response": "fastest",
+}
+
 matched_category = ""
 
 def is_match(word, trigger):
@@ -185,12 +233,23 @@ def is_match(word, trigger):
         return True
     return False
 
+def models_text(llm, category):
+    if category in models[llm]:
+        model_list = models[llm][category]
+    else:
+        model_list = models[llm]["default"]
+    parts = []
+    for model in model_list:
+        parts.append(model + " (" + tags[model] + ")")
+    return " > ".join(parts)
+
 def clear_details():
     logo_label.config(image="")
     name_label.config(text="")
     good_for_label.config(text="")
+    models_label.config(text="")
     keywords_heading.config(text="")
-    keywords_label.config(text="", relief="flat")
+    keywords_label.config(text="", relief="flat", bg="#f3f4f6", padx=0, pady=0)
 
 def find_llms():
     global matched_category
@@ -249,6 +308,7 @@ def show_details():
 
     name_label.config(text=selected_llm, fg="#111827")
     good_for_label.config(text="Good for: " + good_for[selected_llm][matched_category])
+    models_label.config(text="Best models: " + models_text(selected_llm, matched_category))
 
     bullet_text = ""
     for keyword in keywords[matched_category]:
@@ -256,49 +316,59 @@ def show_details():
     bullet_text = bullet_text.strip()
 
     keywords_heading.config(text="Prompt keywords to use")
-    keywords_label.config(text=bullet_text, relief="solid")
+    keywords_label.config(text=bullet_text, relief="solid", bg="#ffffff", padx=30, pady=10)
 
 window = Tk()
 window.title("Prompt Pilot")
-window.geometry("480x820")
+window.geometry("1040x640")
 window.configure(bg="#f3f4f6")
 
 title_label = Label(window, text="Prompt Pilot", font=("Avenir Next", 24, "bold"), fg="#111827", bg="#f3f4f6")
-title_label.pack(pady=(10, 2))
+title_label.pack(pady=(10, 4))
 
-instruction_label = Label(window, text="Describe your task:", font=("Avenir Next", 13), fg="#4b5563", bg="#f3f4f6")
+left_frame = Frame(window, bg="#f3f4f6", width=400, height=520)
+left_frame.pack(side=LEFT, anchor="n", padx=(30, 10), pady=10)
+left_frame.pack_propagate(False)
+
+right_frame = Frame(window, bg="#f3f4f6", width=560, height=520)
+right_frame.pack(side=LEFT, anchor="n", padx=(10, 30), pady=10)
+right_frame.pack_propagate(False)
+
+instruction_label = Label(left_frame, text="Describe your task:", font=("Avenir Next", 13), fg="#4b5563", bg="#f3f4f6")
 instruction_label.pack(pady=2)
 
-task_entry = Entry(window, width=32, font=("Avenir Next", 13), bg="#ffffff", fg="#111827", relief="solid", bd=1)
+task_entry = Entry(left_frame, width=28, font=("Avenir Next", 14), bg="#ffffff", fg="#111827", relief="solid", bd=1)
 task_entry.pack(pady=4)
 
-find_button = Button(window, text="Find LLMs", font=("Avenir Next", 13, "bold"), fg="#111827", cursor="hand2")
+find_button = Button(left_frame, text="Find LLMs", font=("Avenir Next", 13, "bold"), fg="#111827", cursor="hand2")
 find_button.config(command=find_llms)
 find_button.pack(pady=4)
 
-message_label = Label(window, text="", font=("Avenir Next", 13, "bold"), fg="#2563eb", bg="#f3f4f6")
+message_label = Label(left_frame, text="", font=("Avenir Next", 13, "bold"), fg="#2563eb", bg="#f3f4f6")
 message_label.pack(pady=2)
 
-llm_listbox = Listbox(window, height=5, width=26, font=("Avenir Next", 12), bg="#ffffff", fg="#1f2937", selectbackground="#2563eb", selectforeground="#ffffff", relief="solid", bd=1)
-llm_listbox.pack(pady=3)
+llm_listbox = Listbox(left_frame, height=6, width=24, font=("Avenir Next", 13), bg="#ffffff", fg="#1f2937", selectbackground="#2563eb", selectforeground="#ffffff", relief="solid", bd=1)
+llm_listbox.pack(pady=2)
 
-details_button = Button(window, text="Show details", font=("Avenir Next", 13, "bold"), fg="#111827", cursor="hand2")
+details_button = Button(left_frame, text="Show details", font=("Avenir Next", 13, "bold"), fg="#111827", cursor="hand2")
 details_button.config(command=show_details)
 details_button.pack(pady=4)
 
-logo_label = Label(window, bg="#f3f4f6")
+logo_label = Label(right_frame, bg="#f3f4f6")
 logo_label.pack(pady=2)
 
-name_label = Label(window, text="", font=("Avenir Next", 16, "bold"), fg="#111827", bg="#f3f4f6")
-name_label.pack(pady=1)
+name_label = Label(right_frame, text="", font=("Avenir Next", 18, "bold"), fg="#111827", bg="#f3f4f6")
+name_label.pack(pady=2)
 
-good_for_label = Label(window, text="", wraplength=420, justify="center", font=("Avenir Next", 12), fg="#374151", bg="#f3f4f6")
+good_for_label = Label(right_frame, text="", wraplength=520, justify="center", font=("Avenir Next", 12), fg="#374151", bg="#f3f4f6")
 good_for_label.pack(pady=2)
 
-keywords_heading = Label(window, text="", font=("Avenir Next", 13, "bold"), fg="#2563eb", bg="#f3f4f6")
-keywords_heading.pack(pady=(6, 2))
+models_label.pack(pady=2)
 
-keywords_label = Label(window, text="", justify="left", anchor="w", font=("Avenir Next", 13, "bold"), fg="#111827", bg="#ffffff", bd=1, padx=20, pady=8)
-keywords_label.pack(pady=4)
+keywords_heading = Label(right_frame, text="", font=("Avenir Next", 15, "bold"), fg="#2563eb", bg="#f3f4f6")
+keywords_heading.pack(pady=(8, 2))
+
+keywords_label = Label(right_frame, text="", justify="left", anchor="w", font=("Avenir Next", 16, "bold"), fg="#111827", bg="#f3f4f6", bd=2, padx=0, pady=0)
+keywords_label.pack(pady=2)
 
 window.mainloop()
