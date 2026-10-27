@@ -6,3 +6,8 @@ __pycache__/
 .md
 .pptx
 .pdf
+create_presentation.py
+generate_screenshots.py
+screenshot_coding_claude.png
+screenshot_research_perplexity.png
+screenshot_study_chatgpt.png
