@@ -243,19 +243,138 @@ def models_text(llm, category):
         parts.append(model + " (" + tags[model] + ")")
     return " > ".join(parts)
 
-def clear_details():
-    logo_label.config(image="")
-    name_label.config(text="")
-    good_for_label.config(text="")
-    models_label.config(text="")
-    keywords_heading.config(text="")
-    keywords_label.config(text="", relief="flat", bg="#f3f4f6", padx=0, pady=0)
+ACCENT = "#2563eb"
+placeholder_text = "e.g. Explain recursion with examples for my exam"
+placeholder_on = True
+logo_images = {}
+row_widgets = {}
+
+examples = {
+    "Research": "Find the latest news and credible sources on electric vehicles in India",
+    "Coding": "Help me debug a python function that crashes with an error",
+    "Study": "Explain operating system concepts for my exam in simple words",
+    "Writing": "Write a formal email to my professor asking for an extension",
+    "Data": "Analyze a csv file and make a chart of monthly sales",
+}
+
+def make_button(parent, text, command, bg_color="#2563eb", fg_color="#ffffff", size=14):
+    button = Label(parent, text=text, font=("Avenir Next", size, "bold"), bg=bg_color, fg=fg_color, padx=24, pady=8, cursor="hand2")
+    button.bind("<Button-1>", lambda event: command())
+    return button
+
+def get_logo(llm, small):
+    key = llm + str(small)
+    if key in logo_images:
+        return logo_images[key]
+    try:
+        image = PhotoImage(file="logos/" + llm.lower() + ".png")
+        if small:
+            image = image.subsample(2, 2)
+    except TclError:
+        size = 64
+        if small:
+            size = 32
+        image = PhotoImage(width=size, height=size)
+    logo_images[key] = image
+    return image
+
+def show_placeholder():
+    global placeholder_on
+    task_text.delete("1.0", END)
+    task_text.insert("1.0", placeholder_text)
+    task_text.config(fg="#9ca3af")
+    placeholder_on = True
+
+def on_focus_in(event):
+    global placeholder_on
+    if placeholder_on:
+        task_text.delete("1.0", END)
+        task_text.config(fg="#111827")
+        placeholder_on = False
+
+def on_focus_out(event):
+    if task_text.get("1.0", END).strip() == "":
+        show_placeholder()
+
+def fill_example(text):
+    global placeholder_on
+    task_text.delete("1.0", END)
+    task_text.insert("1.0", text)
+    task_text.config(fg="#111827")
+    placeholder_on = False
+    error_label.config(text="")
+
+def on_enter_key(event):
+    find_llms()
+    return "break"
+
+def show_input_screen():
+    results_screen.pack_forget()
+    input_screen.pack(fill=BOTH, expand=True)
+
+def show_results_screen():
+    input_screen.pack_forget()
+    results_screen.pack(fill=BOTH, expand=True)
+
+def build_rows():
+    for child in rows_frame.winfo_children():
+        child.destroy()
+    row_widgets.clear()
+
+    rank = 1
+    for llm in order[matched_category]:
+        row = Frame(rows_frame, bg="#ffffff", cursor="hand2")
+        row.pack(fill=X, pady=3, padx=10)
+
+        rank_label = Label(row, text=str(rank), font=("Avenir Next", 14, "bold"), fg="#6b7280", bg="#ffffff", width=2)
+        rank_label.pack(side=LEFT, padx=(8, 4), pady=8)
+
+        logo_small = Label(row, image=get_logo(llm, True), bg="#ffffff")
+        logo_small.pack(side=LEFT, padx=4)
+
+        name_small = Label(row, text=llm, font=("Avenir Next", 14), fg="#1f2937", bg="#ffffff")
+        name_small.pack(side=LEFT, padx=8)
+
+        row_widgets[llm] = [row, rank_label, logo_small, name_small]
+        for widget in row_widgets[llm]:
+            widget.bind("<Button-1>", lambda event, chosen=llm: select_llm(chosen))
+        rank = rank + 1
+
+def select_llm(selected_llm):
+    for llm in row_widgets:
+        row_color = "#ffffff"
+        if llm == selected_llm:
+            row_color = "#dbeafe"
+        for widget in row_widgets[llm]:
+            widget.config(bg=row_color)
+
+    logo_label.config(image=get_logo(selected_llm, False))
+    name_label.config(text=selected_llm)
+    good_for_label.config(text="Good for: " + good_for[selected_llm][matched_category])
+    models_label.config(text="Best models: " + models_text(selected_llm, matched_category))
+
+    bullet_text = ""
+    for keyword in keywords[matched_category]:
+        bullet_text = bullet_text + "\u2022  " + keyword + "\n"
+    bullet_text = bullet_text.strip()
+
+    keywords_heading.config(text="Prompt keywords to use")
+    keywords_label.config(text=bullet_text)
 
 def find_llms():
     global matched_category
 
-    task_text = task_entry.get()
-    lowercase_text = task_text.lower()
+    if placeholder_on:
+        task_text_value = ""
+    else:
+        task_text_value = task_text.get("1.0", END)
+
+    lowercase_text = task_text_value.lower()
+    if lowercase_text.strip() == "":
+        error_label.config(text="Please describe your task first")
+        return
+    error_label.config(text="")
+
     raw_words = lowercase_text.split()
     clean_words = []
     for word in raw_words:
@@ -278,98 +397,118 @@ def find_llms():
             highest_count = count
             best_category = category
 
-    llm_listbox.delete(0, END)
-    clear_details()
-
     if highest_count == 0:
         matched_category = "general"
-        message_label.config(text="No exact match, showing general picks", fg="#d97706")
+        category_badge.config(text="General picks")
+        note_label.config(text="No exact match found")
     else:
         matched_category = best_category
-        message_label.config(text="Category: " + matched_category, fg="#2563eb")
+        category_badge.config(text="Category: " + matched_category.capitalize())
+        note_label.config(text="")
 
-    for llm in order[matched_category]:
-        llm_listbox.insert(END, llm)
-
-def show_details():
-    selected_indices = llm_listbox.curselection()
-    if len(selected_indices) == 0:
-        clear_details()
-        name_label.config(text="Please select an LLM first", fg="#dc2626")
-        return
-
-    selected_index = selected_indices[0]
-    selected_llm = llm_listbox.get(selected_index)
-
-    logo_path = "logos/" + selected_llm.lower() + ".png"
-    logo_image = PhotoImage(file=logo_path)
-    logo_label.config(image=logo_image)
-    logo_label.image = logo_image
-
-    name_label.config(text=selected_llm, fg="#111827")
-    good_for_label.config(text="Good for: " + good_for[selected_llm][matched_category])
-    models_label.config(text="Best models: " + models_text(selected_llm, matched_category))
-
-    bullet_text = ""
-    for keyword in keywords[matched_category]:
-        bullet_text = bullet_text + "\u2022  " + keyword + "\n"
-    bullet_text = bullet_text.strip()
-
-    keywords_heading.config(text="Prompt keywords to use")
-    keywords_label.config(text=bullet_text, relief="solid", bg="#ffffff", padx=30, pady=10)
+    build_rows()
+    select_llm(order[matched_category][0])
+    show_results_screen()
 
 window = Tk()
 window.title("Prompt Pilot")
 window.geometry("1040x640")
-window.configure(bg="#f3f4f6")
+window.resizable(False, False)
 
-title_label = Label(window, text="Prompt Pilot", font=("Avenir Next", 24, "bold"), fg="#111827", bg="#f3f4f6")
-title_label.pack(pady=(10, 4))
+background_image = PhotoImage(file="background.png")
 
-left_frame = Frame(window, bg="#f3f4f6", width=400, height=520)
-left_frame.pack(side=LEFT, anchor="n", padx=(30, 10), pady=10)
+# ---------- Screen 1: input ----------
+input_screen = Frame(window)
+input_screen.pack(fill=BOTH, expand=True)
+
+input_bg = Label(input_screen, image=background_image)
+input_bg.place(x=0, y=0, relwidth=1, relheight=1)
+
+input_card = Frame(input_screen, bg="#ffffff", highlightbackground="#e5e7eb", highlightthickness=1)
+input_card.place(relx=0.5, rely=0.5, anchor="center")
+
+title_label = Label(input_card, text="Prompt Pilot", font=("Avenir Next", 32, "bold"), fg="#111827", bg="#ffffff")
+title_label.pack(padx=60, pady=(30, 0))
+
+subtitle_label = Label(input_card, text="Find the best LLM and prompt keywords for your task", font=("Avenir Next", 13), fg="#6b7280", bg="#ffffff")
+subtitle_label.pack(pady=(0, 20))
+
+instruction_label = Label(input_card, text="Describe your task in 2-3 lines:", font=("Avenir Next", 13, "bold"), fg="#374151", bg="#ffffff")
+instruction_label.pack(anchor="w", padx=60)
+
+task_text = Text(input_card, width=46, height=4, wrap=WORD, font=("Avenir Next", 14), bg="#ffffff", fg="#9ca3af", relief="solid", bd=1, padx=10, pady=8)
+task_text.pack(padx=60, pady=(6, 4))
+task_text.bind("<FocusIn>", on_focus_in)
+task_text.bind("<FocusOut>", on_focus_out)
+task_text.bind("<Return>", on_enter_key)
+
+error_label = Label(input_card, text="", font=("Avenir Next", 12, "bold"), fg="#dc2626", bg="#ffffff")
+error_label.pack()
+
+chips_heading = Label(input_card, text="Or try an example:", font=("Avenir Next", 12), fg="#6b7280", bg="#ffffff")
+chips_heading.pack(pady=(4, 4))
+
+chips_frame = Frame(input_card, bg="#ffffff")
+chips_frame.pack()
+
+for chip_name in examples:
+    chip = Label(chips_frame, text=chip_name, font=("Avenir Next", 12, "bold"), bg="#eff6ff", fg=ACCENT, padx=12, pady=4, cursor="hand2")
+    chip.pack(side=LEFT, padx=4)
+    chip.bind("<Button-1>", lambda event, chosen=chip_name: fill_example(examples[chosen]))
+
+find_button = make_button(input_card, "Find LLMs", find_llms)
+find_button.pack(pady=(20, 30))
+
+show_placeholder()
+
+# ---------- Screen 2: results ----------
+results_screen = Frame(window)
+
+results_bg = Label(results_screen, image=background_image)
+results_bg.place(x=0, y=0, relwidth=1, relheight=1)
+
+top_bar = Frame(results_screen, bg="#ffffff", highlightbackground="#e5e7eb", highlightthickness=1)
+top_bar.pack(fill=X, padx=30, pady=(20, 10))
+
+back_button = make_button(top_bar, "\u2190  New task", show_input_screen, "#f3f4f6", "#111827", 12)
+back_button.pack(side=LEFT, padx=10, pady=10)
+
+category_badge = Label(top_bar, text="", font=("Avenir Next", 13, "bold"), bg=ACCENT, fg="#ffffff", padx=16, pady=6)
+category_badge.pack(side=RIGHT, padx=10)
+
+note_label = Label(top_bar, text="", font=("Avenir Next", 12, "bold"), fg="#d97706", bg="#ffffff")
+note_label.pack(side=RIGHT, padx=10)
+
+left_frame = Frame(results_screen, bg="#ffffff", width=340, height=500, highlightbackground="#e5e7eb", highlightthickness=1)
+left_frame.pack(side=LEFT, anchor="n", padx=(30, 10), pady=(0, 20))
 left_frame.pack_propagate(False)
 
-right_frame = Frame(window, bg="#f3f4f6", width=560, height=520)
-right_frame.pack(side=LEFT, anchor="n", padx=(10, 30), pady=10)
+right_frame = Frame(results_screen, bg="#ffffff", width=620, height=500, highlightbackground="#e5e7eb", highlightthickness=1)
+right_frame.pack(side=LEFT, anchor="n", padx=(10, 30), pady=(0, 20))
 right_frame.pack_propagate(False)
 
-instruction_label = Label(left_frame, text="Describe your task:", font=("Avenir Next", 13), fg="#4b5563", bg="#f3f4f6")
-instruction_label.pack(pady=2)
+list_heading = Label(left_frame, text="Recommended LLMs", font=("Avenir Next", 15, "bold"), fg="#111827", bg="#ffffff")
+list_heading.pack(pady=(16, 6))
 
-task_entry = Entry(left_frame, width=28, font=("Avenir Next", 14), bg="#ffffff", fg="#111827", relief="solid", bd=1)
-task_entry.pack(pady=4)
+rows_frame = Frame(left_frame, bg="#ffffff")
+rows_frame.pack(fill=X)
 
-find_button = Button(left_frame, text="Find LLMs", font=("Avenir Next", 13, "bold"), fg="#111827", cursor="hand2")
-find_button.config(command=find_llms)
-find_button.pack(pady=4)
+logo_label = Label(right_frame, bg="#ffffff")
+logo_label.pack(pady=(16, 2))
 
-message_label = Label(left_frame, text="", font=("Avenir Next", 13, "bold"), fg="#2563eb", bg="#f3f4f6")
-message_label.pack(pady=2)
-
-llm_listbox = Listbox(left_frame, height=6, width=24, font=("Avenir Next", 13), bg="#ffffff", fg="#1f2937", selectbackground="#2563eb", selectforeground="#ffffff", relief="solid", bd=1)
-llm_listbox.pack(pady=2)
-
-details_button = Button(left_frame, text="Show details", font=("Avenir Next", 13, "bold"), fg="#111827", cursor="hand2")
-details_button.config(command=show_details)
-details_button.pack(pady=4)
-
-logo_label = Label(right_frame, bg="#f3f4f6")
-logo_label.pack(pady=2)
-
-name_label = Label(right_frame, text="", font=("Avenir Next", 18, "bold"), fg="#111827", bg="#f3f4f6")
+name_label = Label(right_frame, text="", font=("Avenir Next", 20, "bold"), fg="#111827", bg="#ffffff")
 name_label.pack(pady=2)
 
-good_for_label = Label(right_frame, text="", wraplength=520, justify="center", font=("Avenir Next", 12), fg="#374151", bg="#f3f4f6")
+good_for_label = Label(right_frame, text="", wraplength=560, justify="center", font=("Avenir Next", 12), fg="#374151", bg="#ffffff")
 good_for_label.pack(pady=2)
 
-models_label = Label(right_frame, text="", wraplength=520, justify="center", font=("Avenir Next", 12, "bold"), fg="#059669", bg="#f3f4f6")
+models_label = Label(right_frame, text="", wraplength=560, justify="center", font=("Avenir Next", 12, "bold"), fg="#059669", bg="#ffffff")
 models_label.pack(pady=2)
 
-keywords_heading = Label(right_frame, text="", font=("Avenir Next", 15, "bold"), fg="#2563eb", bg="#f3f4f6")
-keywords_heading.pack(pady=(8, 2))
+keywords_heading = Label(right_frame, text="", font=("Avenir Next", 15, "bold"), fg=ACCENT, bg="#ffffff")
+keywords_heading.pack(pady=(10, 4))
 
-keywords_label = Label(right_frame, text="", justify="left", anchor="w", font=("Avenir Next", 16, "bold"), fg="#111827", bg="#f3f4f6", bd=2, padx=0, pady=0)
+keywords_label = Label(right_frame, text="", justify="left", anchor="w", font=("Avenir Next", 14, "bold"), fg="#111827", bg="#f9fafb", relief="solid", bd=1, padx=30, pady=8)
 keywords_label.pack(pady=2)
 
 window.mainloop()
